@@ -14,14 +14,14 @@ namespace DatingApp.API.Controllers
         [HttpGet]
         public ActionResult<IEnumerable<string>> Get()
         {
-            return new string[] { "value1", "value2" };
+            return new string[] { "value1", "value3" };
         }
 
         // GET api/values/5
         [HttpGet("{id}")]
         public ActionResult<string> Get(int id)
         {
-            return "value";
+            return $"value: {id}";
         }
 
         // POST api/values
