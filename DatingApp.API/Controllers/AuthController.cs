@@ -1,8 +1,14 @@
+using System;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using System.Threading.Tasks;
 using DatingApp.API.Data;
 using DatingApp.API.Dtos;
 using DatingApp.API.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 namespace DatingApp.API.Controllers
 {
@@ -10,11 +16,13 @@ namespace DatingApp.API.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly IAuthRepository _repo;
+        private readonly IAuthRepository _repository;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(IAuthRepository repo)
+        public AuthController(IAuthRepository repository, IConfiguration configuration)
         {
-            _repo = repo;
+            _configuration = configuration;
+            _repository = repository;
         }
 
         [HttpPost("register")]
@@ -22,7 +30,7 @@ namespace DatingApp.API.Controllers
         {
             userForRegister.UserName = userForRegister.UserName.ToLower();
 
-            if (await _repo.UserExists(userForRegister.UserName))
+            if (await _repository.UserExists(userForRegister.UserName))
                 return BadRequest("User already exists");
 
             var userToCreate = new User
@@ -30,9 +38,45 @@ namespace DatingApp.API.Controllers
                 UserName = userForRegister.UserName
             };
 
-            var createdUser = await _repo.Register(userToCreate, userForRegister.Password);
+            var createdUser = await _repository.Register(userToCreate, userForRegister.Password);
 
             return StatusCode(201);
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login(UserForLoginDto userForLogin)
+        {
+            var userFromRepo = await _repository.Login(userForLogin.UserName.ToLower(), userForLogin.Password);
+
+            if (userFromRepo == null)
+                return Unauthorized();
+
+            // Need return token after login success
+            // How to create token ?
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, userFromRepo.Id.ToString()),
+                new Claim(ClaimTypes.Name, userFromRepo.UserName)
+            };
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration.GetSection("AppSetting:Token").Value));
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.Now.AddDays(1),
+                SigningCredentials = creds
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+
+            return Ok(new {
+                token = tokenHandler.WriteToken(token)
+            });
         }
     }
 }
