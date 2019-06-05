@@ -56,6 +56,12 @@ namespace DatingApp.API
             }
             else
             {
+                // app.UseExceptionHandler(builder => {
+                //     builder.Run(async context => {
+                //         context.
+                //     });
+                // });
+
                 // app.UseHsts();
             }
 
